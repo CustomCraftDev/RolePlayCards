@@ -1,0 +1,69 @@
+msg:
+  prefix: '&7[&2RPC&7] '
+  no-perm: '&cYou dont have permissions to do that.'
+  reload: '&fConfig was reloaded.'
+  sql-error: '&cInternal Server error!'
+  card-toggle: '&cYour Card was toggled successfully!'
+
+settings:
+  updater: true
+  overwrite-displayname: false
+  use-prefix: false
+  prefix: '&7[&2%PLAYER%&7] &f%MSG%'
+  use-confirm: true
+  confirm:
+    name: '&fName changed to: &2%NEW%'
+    gender: '&fGender changed to: &2%NEW%'
+    age: '&fAge changed to: &2%NEW%'
+    race: '&fRace changed to: &2%NEW%'
+    description: '&fDescription was updated'
+
+book:
+  itemname: '&fDescription'
+  inside: 'look at the Item lore for help ...'
+  lore:
+    - '1. Write Text'
+    - '2. Never use the Enter Key'
+    - '3. Sign it'
+    - '4. Hold it in your Hand'
+    - '5. /rpc description'
+    - '6. Profit'
+
+command-examples:
+  - 'This section can be deleted ...'
+  - '/rcp name &c[Owner]Notch'
+  - '/rpc ...'
+  - '/rpc set Notch name &c[Owner]Notch'
+  - '/rpc set Notch ...'
+  - '/rpc reload'
+  - '/rpc check'
+  - '/rpc toggle'
+
+permissions-info:
+  - 'This section can be deleted ...'
+  - 'rpc.reload <--- /rpc reload'
+  - 'rpc.set    <--- /rpc set <player> ...'
+  - 'rpc.get    <--- rightclick to get informations'
+  - 'rpc.prefix <--- replaces your name when use-prefix is enabled'
+  - 'rpc.toggle <--- toggle between two player cards'
+  - 'rpc.color.name <--- allows custom colors for %NICK%'
+  - 'rpc.update <--- you can now see update notifications'
+
+display:
+  - '&8-------[&7Character Card&8]--------'
+  - '&7Player: &2%PLAYER%'
+  - '&7OP: &2%OP%'
+  - '&7UUID: &2%UUID%'
+  - '&7IP: &2%IP%'
+  - '&7Health: &2%HEALTH%'
+  - '&7Hunger: &2%HUNGER%'
+  - '&7Level: &2%LEVEL%'
+  - '&7Gamemode: &2%GAMEMODE%'
+  - '&8--------------------------------'
+  - '&7Name: &2%NICK%'
+  - '&7Gender: &2%GENDER%'
+  - '&7Age: &2%AGE%'
+  - '&7Race: &2%RACE%'
+  - '&7Description:'
+  - '&7%DESCRIPTION%'
+  - '&8----------[  &2v. 4.0 &8 ]------------'
