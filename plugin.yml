@@ -1,0 +1,11 @@
+name: RPC
+main: Cards
+description: Roleplay Player Cards
+version: 4.0
+author: undeaD_D
+authors: [DieFriiks, CustomCraftDev, undeaD_D]
+depend: [SQLibrary]
+commands:
+  rpc:
+    usage: /rpc <check/name/gender/age/race/description --- toggle/reload> or /rpc set <playername> <name/gender/age/race/description>
+    description: Roleplay Player Cards commands
