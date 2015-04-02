@@ -23,15 +23,17 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class Cards extends JavaPlugin implements Listener{
 	
-	
 	private FileConfiguration config;
+	protected boolean update;
 	private Database sql;
+	
+	private boolean displayname;
 	private boolean useconfirm;
 	private boolean useprefix;
-	private boolean displayname;
+
 	private ItemStack book;
-	protected boolean update;
 	private String prefix;
+	
 	
 	public void onEnable() {
 				
@@ -145,7 +147,6 @@ public class Cards extends JavaPlugin implements Listener{
 								
 								BookMeta m = (BookMeta)book.getItemMeta();
 								m.setDisplayName(ChatColor.translateAlternateColorCodes('&', config.getString("book.itemname")));
-								m.setPages(new String[] {config.getString("book.inside")});
 								m.setLore(getLore());
 								book.setItemMeta(m);
 								
@@ -235,6 +236,21 @@ public class Cards extends JavaPlugin implements Listener{
 	// [Helper]------------------------------------------------------------------------------------------------------------------------------
 		
 	
+	private String[] getText(Player p) {
+		try {
+		ResultSet r = sql.query("SELECT DESCRIPTION FROM player WHERE UUID='" + p.getUniqueId().toString() + "';");
+		if(r.next()) {
+			String[] desc = r.getString("DESCRIPTION").replace("%AP%","'").split("(?<=\\G.{250})");
+			for(String page : desc) {
+				page = ChatColor.BLACK + page;
+				p.sendMessage(page);
+			}
+			return desc;
+		}
+		}catch(Exception ex) {}
+		return new String[] {config.getString("book.inside")};
+	}
+	
 	
 	private List<String> getLore() {
 		List<String> lore = config.getStringList("book.lore");
@@ -243,6 +259,7 @@ public class Cards extends JavaPlugin implements Listener{
 		}
 		return lore;
 	}
+	
 	
 	private String join(String[] args) {
 		String result = "";
@@ -288,12 +305,16 @@ public class Cards extends JavaPlugin implements Listener{
 				BookMeta bm = (BookMeta)item.getItemMeta();
 				StringBuilder sb = new StringBuilder();
 				for (String s : bm.getPages()){
-					sb.append(ChatColor.WHITE + s);
+					sb.append(s);
 				}
 				p.setItemInHand(null);
 				change(p, 4, sb.toString(), useconfirm);
 			}else {
-				p.getInventory().addItem(book.clone());
+				ItemStack clone = book.clone();
+				BookMeta cm = (BookMeta) clone.getItemMeta();
+				cm.setPages(getText(p));
+				clone.setItemMeta(cm);
+				p.getInventory().addItem(clone);
 			}
 		}else {
 			if(sender.getItemInHand().getType().equals(Material.WRITTEN_BOOK)) {
@@ -301,12 +322,16 @@ public class Cards extends JavaPlugin implements Listener{
 				BookMeta bm = (BookMeta)item.getItemMeta();
 				StringBuilder sb = new StringBuilder();
 				for (String s : bm.getPages()){
-				    sb.append(ChatColor.WHITE + s);
+				    sb.append(s);
 				}
 				sender.setItemInHand(null);
 				change(p, 4, sb.toString(), false);
 			}else {
-				sender.getInventory().addItem(book.clone());
+				ItemStack clone = book.clone();
+				BookMeta cm = (BookMeta) clone.getItemMeta();
+				cm.setPages(getText(p));
+				clone.setItemMeta(cm);
+				sender.getInventory().addItem(clone);
 				sender.sendMessage(prefix + "Use (/rpc set <playername> description) ... while holding the signed book.");
 			}
 		}
@@ -315,8 +340,8 @@ public class Cards extends JavaPlugin implements Listener{
 	
 	public void insertUser(String id) {
 		try {
-			sql.insert("INSERT OR IGNORE INTO player VALUES ('" + id + "','&c-','&c-','&c-','&c-','&c-');");
-			sql.insert("INSERT OR IGNORE INTO backup VALUES ('" + id + "','&c-','&c-','&c-','&c-','&c-');");
+			sql.insert("INSERT OR IGNORE INTO player VALUES ('" + id + "','&c-','&c-','&c-','&c-','" + config.getString("book.inside") + "');");
+			sql.insert("INSERT OR IGNORE INTO backup VALUES ('" + id + "','&c-','&c-','&c-','&c-','" + config.getString("book.inside") + "');");
 		}catch(Exception ex) {}
 	}
 	
