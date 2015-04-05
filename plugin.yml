@@ -1,7 +1,7 @@
 name: RPC
 main: Cards
 description: Roleplay Player Cards
-version: 4.0
+version: 4.1
 author: undeaD_D
 authors: [DieFriiks, CustomCraftDev, undeaD_D]
 depend: [SQLibrary]
