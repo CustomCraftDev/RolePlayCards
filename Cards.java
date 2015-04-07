@@ -1,8 +1,8 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.List;
-
-import lib.PatPeter.SQLibrary.Database;
-import lib.PatPeter.SQLibrary.SQLite;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -25,63 +25,52 @@ public class Cards extends JavaPlugin implements Listener{
 	
 	private FileConfiguration config;
 	protected boolean update;
-	private Database sql;
+	private Connection sql;
 	
-	private boolean displayname;
 	private boolean useconfirm;
 	private boolean useprefix;
-
+	private boolean enforce_gender;
+	private boolean enforce_age;
+	private boolean must_shift;
+	private boolean debug;
+	
+	private List<String> genders;
 	private ItemStack book;
 	private String prefix;
-	
+	private boolean connection = false;
+
 	
 	public void onEnable() {
-				
-		sql = new SQLite(getServer().getLogger(), "[Cards] ", this.getDataFolder().getAbsolutePath(), "Cards", ".sqlite");
-		if (sql.open()) {
-			try {
-			sql.query("CREATE TABLE IF NOT EXISTS player" +
-	                   "(UUID         CHAR(40)  PRIMARY KEY  NOT NULL, " +
-	                   " NAME         CHAR(40), " + 
-	                   " GENDER       CHAR(40), " + 
-	                   " AGE          CHAR(40), " + 
-	                   " RACE         CHAR(40), " + 
-	                   " DESCRIPTION  CHAR(999) " +
-	                   ");"
-	                  ); 
-			sql.query("CREATE TABLE IF NOT EXISTS backup" +
-	                   "(UUID         CHAR(40)  PRIMARY KEY  NOT NULL, " +
-	                   " NAME         CHAR(40), " + 
-	                   " GENDER       CHAR(40), " + 
-	                   " AGE          CHAR(40), " + 
-	                   " RACE         CHAR(40), " + 
-	                   " DESCRIPTION  CHAR(999) " +
-	                   ");"
-	                  ); 
-			}catch(Exception e) {}
+		config = getConfig();
+		config.options().copyDefaults(true);
+		saveConfig();
+		
+		try {
+	    	Class.forName("org.sqlite.JDBC");
+	    	sql = DriverManager.getConnection("jdbc:sqlite:plugins/RPC/players.db");
+	    	connection = true;
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
+		}
+		
+		if (connection) {
+			setupDB();
 			
-			config = getConfig();
-			config.options().copyDefaults(true);
-			saveConfig();
+			setupVars();
 			
-			prefix = ChatColor.translateAlternateColorCodes('&', config.getString("msg.prefix"));
-			
-			boolean b =config.getBoolean("settings.updater");
+			boolean b = config.getBoolean("settings.updater");
 			if(b) {
-			new Updater(this);
+				new Updater(this);
 			}
 			
-			useconfirm = config.getBoolean("settings.use-confirm");
-			useprefix = config.getBoolean("settings.use-prefix");
-			displayname = config.getBoolean("settings.overwrite-displayname");
-			
-			
-			book = new ItemStack(Material.BOOK_AND_QUILL,1);
-			BookMeta m = (BookMeta)book.getItemMeta();
-			m.setDisplayName(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("book.itemname")));
-			m.setPages(new String[] {config.getString("book.inside")});
-			m.setLore(getLore());
-			book.setItemMeta(m);
+			if(debug) {
+				System.out.println(ChatColor.stripColor(prefix + "-----------------------------------------------------"));
+				System.out.println(ChatColor.stripColor(prefix + " RolePlayCards DEBUG-MODE was activated."));
+				System.out.println(ChatColor.stripColor(prefix + " It is advisable to turn it back off ..."));
+				System.out.println(ChatColor.stripColor(prefix + " this can be done in the config.yml"));
+				System.out.println(ChatColor.stripColor(prefix + "-----------------------------------------------------"));
+			}
 			
 			getServer().getPluginManager().registerEvents(this, this);
 			
@@ -95,7 +84,11 @@ public class Cards extends JavaPlugin implements Listener{
 
 	
 	public void onDisable() {
-		sql.close();
+		try {
+			sql.close();
+		}catch(Exception ex) {
+			if(debug) {ex.printStackTrace();}
+		}
 	}
 	
 	
@@ -140,15 +133,7 @@ public class Cards extends JavaPlugin implements Listener{
 							if(p.hasPermission("rpc.reload")) {
 								reloadConfig();
 								config = getConfig();
-								useconfirm = config.getBoolean("settings.use-confirm");
-								useprefix = config.getBoolean("settings.use-prefix");
-								displayname = config.getBoolean("settings.overwrite-displayname");
-								prefix = ChatColor.translateAlternateColorCodes('&', config.getString("msg.prefix"));
-								
-								BookMeta m = (BookMeta)book.getItemMeta();
-								m.setDisplayName(ChatColor.translateAlternateColorCodes('&', config.getString("book.itemname")));
-								m.setLore(getLore());
-								book.setItemMeta(m);
+								setupVars();
 								
 								p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("msg.reload")));
 								return true;
@@ -192,9 +177,13 @@ public class Cards extends JavaPlugin implements Listener{
 					}
 				}else {
 					System.out.println(ChatColor.stripColor(prefix) + "Commands ingame only ...");
+					return true;
 				}
 			}		
-		}catch(Exception ex) {}
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
+		}
 		return false;
 	}
 	
@@ -207,13 +196,17 @@ public class Cards extends JavaPlugin implements Listener{
 		if(useprefix) {
 			if(e.getPlayer().hasPermission("rpc.prefix")) {
 				try {
-					ResultSet r = sql.query("SELECT NAME FROM player WHERE UUID='" + e.getPlayer().getUniqueId().toString() + "';");
+					Statement stmt = sql.createStatement();
+					ResultSet r = stmt.executeQuery("SELECT NAME FROM player WHERE UUID='" + e.getPlayer().getUniqueId().toString() + "';");
 				    if(r.next()) {
 						String nick = r.getString("NAME");
 						String format = ChatColor.translateAlternateColorCodes('&', config.getString("settings.prefix"));
 						e.setFormat(format.replace("%PLAYER%",nick).replace("%MSG%",e.getMessage()));
 				    }
-				}catch(Exception ex) {}
+				}catch(Exception ex) {
+					System.out.println(config.getString("msg.sql-error"));
+					if(debug) {ex.printStackTrace();}
+				}
 			}
 		}
 	}
@@ -227,8 +220,14 @@ public class Cards extends JavaPlugin implements Listener{
 	
 	@EventHandler
 	public void onPlayerInteract(PlayerInteractEntityEvent e) {
-		if(e.getRightClicked() instanceof Player) {		
-			display(e.getPlayer(), (Player)e.getRightClicked());
+		if(e.getRightClicked() instanceof Player) {
+			if(must_shift) {
+				if(e.getPlayer().isSneaking()) {
+					display(e.getPlayer(), (Player)e.getRightClicked());
+				}
+			}else {
+				display(e.getPlayer(), (Player)e.getRightClicked());
+			}
 		}
 	}
 	
@@ -238,16 +237,20 @@ public class Cards extends JavaPlugin implements Listener{
 	
 	private String[] getText(Player p) {
 		try {
-		ResultSet r = sql.query("SELECT DESCRIPTION FROM player WHERE UUID='" + p.getUniqueId().toString() + "';");
-		if(r.next()) {
-			String[] desc = r.getString("DESCRIPTION").replace("%AP%","'").split("(?<=\\G.{250})");
-			for(String page : desc) {
-				page = ChatColor.BLACK + page;
-				p.sendMessage(page);
+			Statement stmt = sql.createStatement();
+			ResultSet r = stmt.executeQuery("SELECT DESCRIPTION FROM player WHERE UUID='" + p.getUniqueId().toString() + "';");
+			if(r.next()) {
+				String[] desc = r.getString("DESCRIPTION").replace("%AP%","'").split("(?<=\\G.{250})");
+				for(String page : desc) {
+					page = ChatColor.BLACK + page;
+					p.sendMessage(page);
+				}
+				return desc;
 			}
-			return desc;
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
 		}
-		}catch(Exception ex) {}
 		return new String[] {config.getString("book.inside")};
 	}
 	
@@ -272,8 +275,9 @@ public class Cards extends JavaPlugin implements Listener{
 	
 	private void manager(Player p) {
 		try {
-		ResultSet r1 = sql.query("SELECT * FROM player WHERE UUID='" + p.getUniqueId().toString() + "';");
-		ResultSet r2 = sql.query("SELECT * FROM backup WHERE UUID='" + p.getUniqueId().toString() + "';");
+			Statement stmt = sql.createStatement();
+			ResultSet r1 = stmt.executeQuery("SELECT * FROM player WHERE UUID='" + p.getUniqueId().toString() + "';");
+			ResultSet r2 = stmt.executeQuery("SELECT * FROM backup WHERE UUID='" + p.getUniqueId().toString() + "';");
 	    if(r1.next()) {
 			String nick1 = r1.getString("NAME");
 			String gender1 = r1.getString("GENDER");
@@ -288,13 +292,16 @@ public class Cards extends JavaPlugin implements Listener{
 				String race2 = r2.getString("RACE");
 				String desc2 = r2.getString("DESCRIPTION");
 				
-				sql.query("UPDATE player SET NAME='" + nick2 + "', GENDER='" + gender2 + "', AGE='" + age2 + "', RACE='" + race2 + "', DESCRIPTION='" + desc2 + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
-				sql.query("UPDATE backup SET NAME='" + nick1 + "', GENDER='" + gender1 + "', AGE='" + age1 + "', RACE='" + race1 + "', DESCRIPTION='" + desc1 + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+				stmt.executeUpdate("UPDATE player SET NAME='" + nick2 + "', GENDER='" + gender2 + "', AGE='" + age2 + "', RACE='" + race2 + "', DESCRIPTION='" + desc2 + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+				stmt.executeUpdate("UPDATE backup SET NAME='" + nick1 + "', GENDER='" + gender1 + "', AGE='" + age1 + "', RACE='" + race1 + "', DESCRIPTION='" + desc1 + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
 					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("msg.card-toggle")));
 		    }
 	    }
-
-		}catch(Exception ex) {}
+	    stmt.close();
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
+		}
 	}
 	
 	
@@ -340,58 +347,98 @@ public class Cards extends JavaPlugin implements Listener{
 	
 	public void insertUser(String id) {
 		try {
-			sql.insert("INSERT OR IGNORE INTO player VALUES ('" + id + "','&c-','&c-','&c-','&c-','" + config.getString("book.inside") + "');");
-			sql.insert("INSERT OR IGNORE INTO backup VALUES ('" + id + "','&c-','&c-','&c-','&c-','" + config.getString("book.inside") + "');");
-		}catch(Exception ex) {}
+			Statement stmt = sql.createStatement();
+			stmt.executeUpdate("INSERT OR IGNORE INTO player VALUES ('" + id + "','&c-','&c-','&c-','&c-','" + config.getString("book.inside") + "');");
+			stmt.executeUpdate("INSERT OR IGNORE INTO backup VALUES ('" + id + "','&c-','&c-','&c-','&c-','" + config.getString("book.inside") + "');");
+			stmt.close();
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
+		}
 	}
 	
 
 	private void change(Player p, int i, String insert, boolean confirm) {
 		try {
+			Statement stmt = sql.createStatement();
 			switch(i){
 			case 0:
-				sql.query("UPDATE player SET NAME='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
-				if(displayname) {
-					p.setDisplayName(insert);
-				}
+				stmt.executeUpdate("UPDATE player SET NAME='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
 				if(confirm) {
 					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.name").replace("%NEW%", insert)));
 				}
 				return;
 			case 1:
-				sql.query("UPDATE player SET GENDER='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
-				if(confirm) {
-					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.gender").replace("%NEW%", insert)));
+				if(enforce_gender) {
+					try {
+						if(checkgender(insert)) {
+							stmt.executeUpdate("UPDATE player SET GENDER='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+							if(confirm) {
+								p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.gender").replace("%NEW%", insert)));
+							}
+						}else {
+							p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("enforce.error-gender")));
+						}
+						return;
+					}catch(Exception ex2) {
+						System.out.println(config.getString("msg.sql-error"));
+						if(debug) {ex2.printStackTrace();}
+					}
+				}else {
+					stmt.executeUpdate("UPDATE player SET GENDER='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+					if(confirm) {
+						p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.gender").replace("%NEW%", insert)));
+					}
 				}
 				return;
 			case 2:
-				sql.query("UPDATE player SET AGE='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
-				if(confirm) {
-					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.age").replace("%NEW%", insert)));
+				if(enforce_age) {
+					try {
+						int j = Integer.parseInt(insert);
+						stmt.executeUpdate("UPDATE player SET AGE='" + j + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+						if(confirm) {
+							p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.age").replace("%NEW%", insert)));
+						}
+						return;
+					}catch(Exception ex2) {
+						System.out.println(config.getString("msg.sql-error"));
+						if(debug) {ex2.printStackTrace();}
+					}
+					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("enforce.error-age")));
+				}else {
+					stmt.executeUpdate("UPDATE player SET AGE='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+					if(confirm) {
+						p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.age").replace("%NEW%", insert)));
+					}
 				}
 				return;
 			case 3:
-				sql.query("UPDATE player SET RACE='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+				stmt.executeUpdate("UPDATE player SET RACE='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
 				if(confirm) {
 					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.race").replace("%NEW%", insert)));
 				}
 				return;
 			case 4:	
 				insert = insert.replace("`","%AP%").replace("'","%AP%");
-				sql.query("UPDATE player SET DESCRIPTION='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
+				stmt.executeUpdate("UPDATE player SET DESCRIPTION='" + insert + "' WHERE UUID='" + p.getUniqueId().toString() + "';");
 				if(confirm) {
 					p.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("settings.confirm.description").replace("%NEW%", insert)));
 				}
 				return;
 			}
-		} catch (Exception ex) {}
+			stmt.close();
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
+		}
 	}
 	
 	
 	private void display(Player to, Player from) {
 		if(to.hasPermission("rpc.get")) {
 			try {
-				ResultSet r = sql.query("SELECT * FROM player WHERE UUID='" + from.getUniqueId().toString() + "';");
+				Statement stmt = sql.createStatement();
+				ResultSet r = stmt.executeQuery("SELECT * FROM player WHERE UUID='" + from.getUniqueId().toString() + "';");
 			    if(r.next()) {
 					String nick = r.getString("NAME");
 					String gender = r.getString("GENDER");
@@ -400,17 +447,28 @@ public class Cards extends JavaPlugin implements Listener{
 					String description = r.getString("DESCRIPTION");
 					
 					r.close();
-					display(from, to, nick, gender, age, race, description);
+					
+					List<String> list;
+					if(to.hasPermission("rpc.extended_display")) {
+						list = config.getStringList("display-extended");
+					}else {
+						list = config.getStringList("display");
+					}
+					display(from, to, nick, gender, age, race, description, list);
 			    }
-			}catch(Exception ex) {}
+			    stmt.close();
+			}catch(Exception ex) {
+				System.out.println(config.getString("msg.sql-error"));
+				if(debug) {ex.printStackTrace();}
+			}
 		}else {
 			to.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("msg.no-perm")));
 		}
 	}
 	
 	
-	private void display(Player from, Player to, String nick, String gender, String age, String race, String description) {
-		for(String msg : config.getStringList("display")) {
+	private void display(Player from, Player to, String nick, String gender, String age, String race, String description, List<String> list) {
+		for(String msg : list) {
 			msg = msg.replace("%PLAYER%", from.getName());
 			msg = msg.replace("%OP%", "" + from.isOp());
 			msg = msg.replace("%UUID%", from.getUniqueId().toString());
@@ -446,6 +504,73 @@ public class Cards extends JavaPlugin implements Listener{
 			msg = ChatColor.translateAlternateColorCodes('&',msg);
 			to.sendMessage(msg);
 		}
+	}
+	
+	
+	private boolean setupDB() {
+		try {
+			Statement stmt = sql.createStatement();
+			String query = "CREATE TABLE IF NOT EXISTS player" +
+	                   "(UUID         CHAR(40)  PRIMARY KEY  NOT NULL, " +
+	                   " NAME         CHAR(40), " + 
+	                   " GENDER       CHAR(40), " + 
+	                   " AGE          CHAR(40), " + 
+	                   " RACE         CHAR(40), " + 
+	                   " DESCRIPTION  CHAR(999) " +
+	                   ");";
+			stmt.executeUpdate(query);
+			stmt.close();
+			
+			stmt = sql.createStatement();
+			query = "CREATE TABLE IF NOT EXISTS backup" +
+	                   "(UUID         CHAR(40)  PRIMARY KEY  NOT NULL, " +
+	                   " NAME         CHAR(40), " + 
+	                   " GENDER       CHAR(40), " + 
+	                   " AGE          CHAR(40), " + 
+	                   " RACE         CHAR(40), " + 
+	                   " DESCRIPTION  CHAR(999) " +
+	                   ");";
+			stmt.executeUpdate(query);
+			stmt.close();
+			return true;
+		}catch(Exception ex) {
+			System.out.println(config.getString("msg.sql-error"));
+			if(debug) {ex.printStackTrace();}
+		}
+		return false;
+	}
+	
+	
+	private void setupVars() {
+		debug = config.getBoolean("settings.debug");
+		prefix = ChatColor.translateAlternateColorCodes('&', config.getString("msg.prefix"));
+				
+		useconfirm = config.getBoolean("settings.use-confirm");
+		useprefix = config.getBoolean("settings.use-prefix");
+		must_shift = config.getBoolean("settings.must-shift-rightclick");
+		enforce_age = config.getBoolean("settings.use-confirm");
+		enforce_gender = config.getBoolean("settings.use-confirm");
+		if(enforce_gender) {
+			genders = config.getStringList("enforce.gender-options");
+		}
+		
+		book = new ItemStack(Material.BOOK_AND_QUILL,1);
+		BookMeta m = (BookMeta)book.getItemMeta();
+		m.setDisplayName(prefix + ChatColor.translateAlternateColorCodes('&', config.getString("book.itemname")));
+		m.setPages(new String[] {config.getString("book.inside")});
+		m.setLore(getLore());
+		book.setItemMeta(m);
+	}
+	
+	
+	private boolean checkgender(String insert) {
+		String new_insert = ChatColor.stripColor(insert).toLowerCase();
+		for(String value : genders) {
+			if(value.equalsIgnoreCase(new_insert)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	
