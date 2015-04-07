@@ -2,12 +2,24 @@ msg:
   prefix: '&7[&2RPC&7] '
   no-perm: '&cYou dont have permissions to do that.'
   reload: '&fConfig was reloaded.'
-  sql-error: '&cInternal Server error!'
+  sql-error: 'Internal Mysql error!'
   card-toggle: '&cYour Card was toggled successfully!'
 
+enforce:
+  age-must-be-integer: true
+  error-age: '&cYou must enter a valid Number.'
+  gender-must-be-in-options: true
+  error-gender: '&cYou must only one of these: Female/Male/Unknown/Random'
+  gender-options:
+    - 'Female'
+    - 'Male'
+    - 'Unknown'
+    - 'Random'
+
 settings:
+  debug: false
   updater: true
-  overwrite-displayname: false
+  must-shift-rightclick: false
   use-prefix: false
   prefix: '&7[&2%PLAYER%&7] &f%MSG%'
   use-confirm: true
@@ -47,9 +59,22 @@ permissions-info:
   - 'rpc.prefix <--- replaces your name when use-prefix is enabled'
   - 'rpc.toggle <--- toggle between two player cards'
   - 'rpc.color.name <--- allows custom colors for %NICK%'
-  - 'rpc.update <--- you can now see update notifications'
+  - 'rpc.implementeupdate <--- you can now see update notifications'
+  - 'rpc.extended_display <--- view the display-extended list'
 
 display:
+  - '&8-------[&7Character Card&8]--------'
+  - '&7Name: &2%NICK%'
+  - '&7Gender: &2%GENDER%'
+  - '&7Age: &2%AGE%'
+  - '&7Race: &2%RACE%'
+  - '&7Description:'
+  - '&7%DESCRIPTION%'
+  - '&8--------------------------------'
+  - '&8displays Lists can be edited in the config'
+  - '&8----------[  &2v. 5.0 &8 ]------------'
+
+display-extended:
   - '&8-------[&7Character Card&8]--------'
   - '&7Player: &2%PLAYER%'
   - '&7OP: &2%OP%'
@@ -66,4 +91,4 @@ display:
   - '&7Race: &2%RACE%'
   - '&7Description:'
   - '&7%DESCRIPTION%'
-  - '&8----------[  &2v. 4.1 &8 ]------------'
+  - '&8----------[  &2v. 5.0 &8 ]------------'
