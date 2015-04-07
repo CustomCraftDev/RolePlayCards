@@ -10,7 +10,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 
 public class Updater implements Listener{
 	private Cards plugin;
-	private int version = 5;
+	private int version = 6;
 
 	public Updater(Cards plugin) {
 		this.plugin = plugin;
